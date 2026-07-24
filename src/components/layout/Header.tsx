@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { ChevronsUpDown, Plus, Bell } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { ChevronsUpDown, Plus, Bell, Moon, Sun } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +18,19 @@ type Props = {
 };
 
 export function Header({ seller, onSellerChange, mobileButton }: Props) {
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const stored = localStorage.getItem("theme");
+    const dark = stored ? stored === "dark" : document.documentElement.classList.contains("dark");
+    setIsDark(dark);
+    document.documentElement.classList.toggle("dark", dark);
+  }, []);
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  };
   return (
     <header className="px-4 md:px-8 pt-5 md:pt-6">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
@@ -59,6 +72,13 @@ export function Header({ seller, onSellerChange, mobileButton }: Props) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            className="neu-pressable h-10 w-10 grid place-items-center"
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+          >
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           <button
             className="neu-pressable h-10 w-10 grid place-items-center"
             onClick={() => toast("No new alerts", { description: "You're all caught up." })}
