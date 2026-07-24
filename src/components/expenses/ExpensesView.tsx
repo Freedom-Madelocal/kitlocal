@@ -4,6 +4,7 @@ import { ReceiptDropzone } from "./ReceiptDropzone";
 import { LineItemAllocator } from "./LineItemAllocator";
 import { ProfitSummary } from "./ProfitSummary";
 import { ExpenseHistory } from "./ExpenseHistory";
+import { RevenueSources } from "./RevenueSources";
 import { sampleReceipt, type ReceiptLineItem } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
