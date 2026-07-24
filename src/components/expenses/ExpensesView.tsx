@@ -18,6 +18,7 @@ export function ExpensesView() {
   const [items, setItems] = useState<ReceiptLineItem[]>(sampleReceipt.items);
   const [vendor, setVendor] = useState<string>(sampleReceipt.vendor);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [addedRevenue, setAddedRevenue] = useState(0);
 
   const totals = useMemo(() => {
     const cogs = items.filter((i) => i.category === "cogs").reduce((s, i) => s + i.amount, 0);
