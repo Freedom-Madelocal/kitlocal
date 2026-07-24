@@ -74,6 +74,13 @@ export function Header({ seller, onSellerChange, mobileButton }: Props) {
         <div className="flex items-center gap-2 shrink-0">
           <button
             className="neu-pressable h-10 w-10 grid place-items-center"
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+          >
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+          <button
+            className="neu-pressable h-10 w-10 grid place-items-center"
             onClick={() => toast("No new alerts", { description: "You're all caught up." })}
             aria-label="Notifications"
           >
