@@ -43,7 +43,9 @@ export function ExpensesView() {
         </p>
       </header>
 
-      <ProfitSummary cogs={totals.cogs} overhead={totals.overhead} />
+      <ProfitSummary cogs={totals.cogs} overhead={totals.overhead} addedRevenue={addedRevenue} />
+
+      <RevenueSources onTotalChange={setAddedRevenue} />
 
       {/* Add a receipt */}
       <section className="neu-card p-5 md:p-7 flex flex-col gap-5">
