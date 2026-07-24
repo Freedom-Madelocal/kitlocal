@@ -1,7 +1,15 @@
 import { marketRevenueTotal } from "@/lib/mock-data";
 
-export function ProfitSummary({ cogs, overhead }: { cogs: number; overhead: number }) {
-  const revenue = marketRevenueTotal();
+export function ProfitSummary({
+  cogs,
+  overhead,
+  addedRevenue = 0,
+}: {
+  cogs: number;
+  overhead: number;
+  addedRevenue?: number;
+}) {
+  const revenue = marketRevenueTotal() + addedRevenue;
   const netProfit = revenue - cogs - overhead;
   const margin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
 

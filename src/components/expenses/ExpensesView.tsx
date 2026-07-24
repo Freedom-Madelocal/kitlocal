@@ -4,6 +4,7 @@ import { ReceiptDropzone } from "./ReceiptDropzone";
 import { LineItemAllocator } from "./LineItemAllocator";
 import { ProfitSummary } from "./ProfitSummary";
 import { ExpenseHistory } from "./ExpenseHistory";
+import { RevenueSources } from "./RevenueSources";
 import { sampleReceipt, type ReceiptLineItem } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ export function ExpensesView() {
   const [items, setItems] = useState<ReceiptLineItem[]>(sampleReceipt.items);
   const [vendor, setVendor] = useState<string>(sampleReceipt.vendor);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [addedRevenue, setAddedRevenue] = useState(0);
 
   const totals = useMemo(() => {
     const cogs = items.filter((i) => i.category === "cogs").reduce((s, i) => s + i.amount, 0);
@@ -41,7 +43,9 @@ export function ExpensesView() {
         </p>
       </header>
 
-      <ProfitSummary cogs={totals.cogs} overhead={totals.overhead} />
+      <ProfitSummary cogs={totals.cogs} overhead={totals.overhead} addedRevenue={addedRevenue} />
+
+      <RevenueSources onTotalChange={setAddedRevenue} />
 
       {/* Add a receipt */}
       <section className="neu-card p-5 md:p-7 flex flex-col gap-5">
