@@ -18,6 +18,19 @@ type Props = {
 };
 
 export function Header({ seller, onSellerChange, mobileButton }: Props) {
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const stored = localStorage.getItem("theme");
+    const dark = stored ? stored === "dark" : document.documentElement.classList.contains("dark");
+    setIsDark(dark);
+    document.documentElement.classList.toggle("dark", dark);
+  }, []);
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  };
   return (
     <header className="px-4 md:px-8 pt-5 md:pt-6">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
