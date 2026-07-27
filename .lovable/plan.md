@@ -1,76 +1,83 @@
-# MadeLocal Seller Command Center — Build Plan
+# MadeLocal integration — build plan (mock-first UI, live wiring gated)
 
-A mobile-first, neumorphic dashboard for local food producers with three feature tabs, powered entirely by mock data (no backend needed).
+CTO's clarifications accepted. Corrections baked in: `transactions` table (not `sales`/`orders`), `get-seller-analytics` is engagement-only and won't be used for revenue, production domain is `buymadelocal.com` so we plan for Mechanism 1 on that root, and RevenueSources' `localStorage` architecture needs a real state upgrade for the MadeLocal chip. This plan follows the CTO's 8-step sequence and only executes steps 1–3 in this build; steps 4–8 are queued behind three confirmations.
 
-## Design System
+## Scope of THIS build (steps 1–3, mock-first, no live data)
 
-Update `src/styles.css` with the warm, grounded palette:
-- `--background`: warm cream `#fdfbf7`
-- `--primary`: deep forest green `#1b4332`
-- `--accent`: amber `#d97706`
-- `--foreground`: slate
-- Neumorphic tokens: `--shadow-neu` (dual light/dark drop shadows), `--shadow-neu-inset`, `--shadow-neu-sm`
-- `Inter` (body) + `Fraunces` (display) via `<link>` in `__root.tsx`
-- Add `@utility neu-card`, `neu-inset`, `neu-pressable` for reusable neumorphic surfaces
+Everything here ships behind a feature flag and preserves today's demo. No Supabase enablement in this repo yet, no secrets requested yet, no server code that assumes a live `transactions` schema.
 
-## Routes
+### 1. Feature flag + connection state model
 
-Single dashboard route with tab-based navigation (tabs preserve state in URL search param `?tab=`):
-- `src/routes/index.tsx` — replaces placeholder, renders the dashboard shell
-- Header component: seller profile switcher ("Wildflower Sourdough Co." dropdown with 2-3 mock sellers) + quick action buttons (New Post, Add Expense)
-- Desktop: left icon sidebar. Mobile: bottom nav bar. Both neumorphic.
-- Update `__root.tsx` head metadata (title/description/og — app-specific, no more "Lovable App")
+- `src/lib/madelocal-integration.ts` — single source of truth:
+  - `MADELOCAL_LIVE = false` constant (flip to `true` when creds land).
+  - Types: `MadeLocalConnectionStatus = "disconnected" | "connecting" | "connected" | "error"`.
+  - Mock adapter: `getMockMadeLocalRevenue()` returns `{ total, since, lastUpdated, txCount }` derived from `mock-data.ts` so the UI has believable numbers immediately.
+  - `useMadeLocalRevenue()` hook — reads mock today, will switch to a `createServerFn` query in step 7. Same return shape either way, so components never change again.
 
-## Feature 1: Marketing Hub (`src/components/marketing/`)
+### 2. RevenueSources: promote MadeLocal from manual chip to connected source
 
-- `PostAnalyzer.tsx` — Input for URL or draft text + "Analyze Post" button. On click, simulates analysis (setTimeout ~800ms) and renders:
-- `ReportCard.tsx` — Hook Score gauge (e.g., 85/100), Engagement Potential badge, two columns: Key Positives (green checks) and Missed Opportunities (amber alerts). Mock analysis picks from preset responses.
-- `ContentNudges.tsx` — Widget listing AI-suggested nudges tied to upcoming markets from mock calendar data. Each nudge has a "One-Click Draft Post" button that opens a Dialog showing generated caption + hashtags with a Copy button.
+Change `src/components/expenses/RevenueSources.tsx`:
+- MadeLocal preset becomes a **special-case source**, not a normal chip. When present it renders a distinct "connected source" row above the manual chips.
+- The row shows: MadeLocal wordmark/icon, connection status pill (Not connected / Connected / Syncing / Error), the current period total, "Last updated Xm ago", and either a **Connect MadeLocal** button (disconnected) or a **Refresh** / **Disconnect** menu (connected).
+- Manual "Log revenue" form disables the MadeLocal option in the source dropdown with helper text: "MadeLocal revenue is pulled from your account automatically."
+- Existing localStorage-backed `RevenueEntry` records tagged to MadeLocal are preserved but marked read-only and clearly labeled "Manual (legacy)" — no data loss, no confusion.
+- `onTotalChange` still fires a single number to `ExpensesView`, but its internals now sum: manual entries (localStorage, unchanged) + `useMadeLocalRevenue().total` (mock today).
 
-## Feature 2: Market Calendar (`src/components/calendar/`)
+While `MADELOCAL_LIVE = false`, the Connect button opens a small dialog that says "Coming soon — connects to your MadeLocal seller account" and offers a **Simulate connection** toggle so the connected-state UI is reviewable now.
 
-- `MarketCalendar.tsx` — Weekly/monthly toggle. Monthly = grid with market chips on event days; Weekly = agenda list. Uses `date-fns` (already common in shadcn) — install if missing.
-- `MarketDetailDrawer.tsx` — Shadcn Sheet opens on market click, contains three sections:
-  - **Historical Sales Recap** — small table of last visit's item sales + revenue
-  - **Smart Prep Estimator** — item list with suggested quantities, weather badge (e.g., "☀️ 72°F, sunny — +10% demand"), editable inputs
-  - **Quick-Comms** — Tabs for Email/SMS, pre-filled templates (electricity request, late arrival, booth check) with To/Subject/Body pre-populated
-- Mock data: 6-8 markets across next 4 weeks (Downtown Farmers Market, Riverside Pop-up, etc.)
+### 3. ProfitSummary: accept MadeLocal server total as a distinct input
 
-## Feature 3: Expenses & Profit (`src/components/expenses/`)
+Change `src/components/expenses/ProfitSummary.tsx`:
+- New prop `madeLocalRevenue?: number` (separate from `addedRevenue`).
+- Compute: `revenue = marketRevenue + addedRevenue + madeLocalRevenue`.
+- Add a one-line breakdown under the headline: "Markets · Manual sources · MadeLocal" with each subtotal, so it is obvious where the number comes from and where MadeLocal will start plugging in.
+- `ExpensesView` passes both values in.
 
-- `ReceiptDropzone.tsx` — Drag-drop area (visual only; accepts file, shows filename, simulates OCR)
-- `LineItemAllocator.tsx` — Table of extracted items with a toggle (Switch/SegmentedControl) per row: **COGS** vs **Overhead**. Running totals update live.
-- `ProfitSummary.tsx` — Card with Total Revenue, Total COGS, Overhead, Net Profit ($ + margin %). Uses mock revenue from calendar sales + user's allocations.
-- `ExpenseHistory.tsx` — Recent receipts table
+### 4. Handoff scaffolding (UI only, no cookies yet)
 
-## Mock Data (`src/lib/mock-data.ts`)
+- `src/routes/auth/handoff.tsx` — server route stub that reads a `?code=` param and today just logs + redirects to `/`. Wired in but inert. Adding it now avoids a late routing change and keeps Mechanism 2 available if the domain plan slips.
+- No Supabase client wired, no session code. Documented TODO block referencing the CTO's 8-step sequence.
 
-Single source with:
-- `sellers` (3 profiles)
-- `markets` (upcoming + past with sales history)
-- `posts` (sample analyses)
-- `receipts` (sample OCR line items)
-- `weather` (per-market forecast)
+### 5. What is NOT in this build
 
-## Technical Details
+Deferred to a follow-up plan behind the three CTO gates:
+- Enabling Lovable Cloud / connecting to the existing MadeLocal Supabase project.
+- Writing `getMySales()` against `transactions`.
+- Cookie-domain configuration on `.buymadelocal.com`.
+- The "Open Command Center" button in the madelocal repo (that PR lives in the other codebase).
+- Removing the feature flag.
 
-- All UI state via React state / URL search params — no persistence needed
-- Uses existing shadcn: Tabs, Card, Dialog, Sheet, Badge, Button, Input, Table, Switch, Dropdown, Progress
-- Fonts loaded via `<link>` in `__root.tsx` head
-- Fully responsive: sidebar collapses to bottom nav <768px; drawers become full-screen on mobile
-- No backend, no Lovable Cloud — pure frontend with mock data
+## Confirmations required before steps 4–8
 
-## File Additions
-```
-src/routes/index.tsx                       (rewrite)
-src/routes/__root.tsx                       (head metadata + fonts)
-src/styles.css                              (palette + neumorphic tokens/utilities)
-src/lib/mock-data.ts
-src/components/layout/AppShell.tsx
-src/components/layout/Header.tsx
-src/components/layout/SideNav.tsx
-src/components/layout/BottomNav.tsx
-src/components/marketing/{PostAnalyzer,ReportCard,ContentNudges,DraftPostDialog}.tsx
-src/components/calendar/{MarketCalendar,MarketDetailDrawer,PrepEstimator,QuickComms}.tsx
-src/components/expenses/{ReceiptDropzone,LineItemAllocator,ProfitSummary,ExpenseHistory}.tsx
-```
+I will not start those until you paste back:
+
+1. `transactions.status` value for a Stripe-completed order (`completed`? `paid`? `succeeded`?). Also confirm whether cash orders should count and at what status.
+2. RLS on `transactions`: is there a `SELECT` policy of the shape `seller_id = auth.uid()`? If only buyer-side policies exist today, MadeLocal will need to add the seller-side one before kitlocal can read anything.
+3. Revenue field: `amount` (gross) or `final_amount` (post-platform-fee)? Which one should feed "true profit"? My recommendation is `final_amount` so kitlocal shows what the seller actually received, but call it.
+
+Two smaller ones while you're in the dashboard:
+
+4. Is `transactions.seller_id` indexed? A seller list without an index will be slow once volume grows; adding one is a one-line migration on the MadeLocal side.
+5. Any soft-delete / refund columns (`refunded_at`, `voided`) we should exclude from the sum?
+
+## Follow-up build (step 4–8, drafted for approval later)
+
+For visibility, not for execution now:
+
+- Enable Lovable Cloud on kitlocal **pointed at the existing MadeLocal project ref `kygqkcnrxxsauibhlvno`** (URL + publishable key are public; service role via secure secret form).
+- Configure both apps' Supabase clients to persist session in a cookie scoped to `.buymadelocal.com` (`Secure`, `SameSite=Lax`). kitlocal lives at e.g. `kit.buymadelocal.com`, madelocal at `app.buymadelocal.com`.
+- `src/lib/madelocal-sales.functions.ts` → `getMySales({ since, until })` — `createServerFn` + `requireSupabaseAuth`, `context.supabase.from("transactions").select("final_amount, created_at").eq("seller_id", context.userId).eq("status", <confirmed>)`.
+- Swap `useMadeLocalRevenue()` from mock adapter to the server fn via TanStack Query with a stale time + last-good fallback so a Supabase blip shows the previous number with a stale badge instead of a blank card.
+- Delete the "Simulate connection" affordance, flip `MADELOCAL_LIVE = true`.
+- MadeLocal-side PR (separate repo, not in this build): add the "Open Command Center" button on Profile, switch the Supabase client to domain-scoped cookie storage, add kitlocal origin to Auth redirect allow-list.
+
+## Files this build touches
+
+- `src/lib/madelocal-integration.ts` (new)
+- `src/components/expenses/RevenueSources.tsx` (edit — connected MadeLocal row, disable in manual dropdown, preserve legacy entries)
+- `src/components/expenses/ProfitSummary.tsx` (edit — new prop + breakdown line)
+- `src/components/expenses/ExpensesView.tsx` (edit — thread MadeLocal total through)
+- `src/routes/auth/handoff.tsx` (new — inert stub)
+- No changes to routing gates, no `_authenticated/` layout, no Supabase files.
+
+Ready to build steps 1–3 on your go-ahead. Confirmations 1–3 can come after — they only block the follow-up build.

@@ -19,6 +19,7 @@ export function ExpensesView() {
   const [vendor, setVendor] = useState<string>(sampleReceipt.vendor);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [addedRevenue, setAddedRevenue] = useState(0);
+  const [madeLocalRevenue, setMadeLocalRevenue] = useState(0);
 
   const totals = useMemo(() => {
     const cogs = items.filter((i) => i.category === "cogs").reduce((s, i) => s + i.amount, 0);
@@ -43,9 +44,17 @@ export function ExpensesView() {
         </p>
       </header>
 
-      <ProfitSummary cogs={totals.cogs} overhead={totals.overhead} addedRevenue={addedRevenue} />
+      <ProfitSummary
+        cogs={totals.cogs}
+        overhead={totals.overhead}
+        addedRevenue={addedRevenue}
+        madeLocalRevenue={madeLocalRevenue}
+      />
 
-      <RevenueSources onTotalChange={setAddedRevenue} />
+      <RevenueSources
+        onTotalChange={setAddedRevenue}
+        onMadeLocalTotalChange={setMadeLocalRevenue}
+      />
 
       {/* Add a receipt */}
       <section className="neu-card p-5 md:p-7 flex flex-col gap-5">
