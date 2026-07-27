@@ -1,7 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Wallet, DollarSign, Landmark, Store, X } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Wallet,
+  DollarSign,
+  Landmark,
+  Store,
+  X,
+  RefreshCw,
+  Link2,
+  Link2Off,
+  CheckCircle2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  MADELOCAL_LIVE,
+  formatRelative,
+  useMadeLocalRevenue,
+} from "@/lib/madelocal-integration";
 
 export type Cadence = "day" | "week" | "month";
 
@@ -20,11 +37,12 @@ export type RevenueEntry = {
   note?: string;
 };
 
+// Manual presets — MadeLocal is intentionally excluded here; it's a connected
+// source rendered separately above.
 const PRESETS: RevenueSource[] = [
   { id: "venmo", name: "Venmo", preset: "venmo" },
   { id: "zelle", name: "Zelle", preset: "zelle" },
   { id: "paypal", name: "PayPal", preset: "paypal" },
-  { id: "madelocal", name: "MadeLocal", preset: "madelocal" },
 ];
 
 const SOURCES_KEY = "ml.revenueSources.v1";
@@ -35,7 +53,7 @@ function loadSources(): RevenueSource[] {
     const raw = localStorage.getItem(SOURCES_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
-  return [PRESETS[0], PRESETS[3]]; // default: Venmo + MadeLocal enabled
+  return [PRESETS[0]]; // default: Venmo
 }
 function loadEntries(): RevenueEntry[] {
   try {
@@ -67,13 +85,26 @@ function fmtDate(iso: string) {
 
 type Props = {
   onTotalChange?: (total: number) => void;
+  onMadeLocalTotalChange?: (total: number) => void;
 };
 
-export function RevenueSources({ onTotalChange }: Props) {
-  const [sources, setSources] = useState<RevenueSource[]>(loadSources);
+export function RevenueSources({ onTotalChange, onMadeLocalTotalChange }: Props) {
+  // Filter out any legacy MadeLocal chip records — it's now a connected source.
+  const [sources, setSources] = useState<RevenueSource[]>(() =>
+    loadSources().filter((s) => s.preset !== "madelocal"),
+  );
   const [entries, setEntries] = useState<RevenueEntry[]>(loadEntries);
   const [addingSource, setAddingSource] = useState(false);
   const [customName, setCustomName] = useState("");
+  const [showConnectDialog, setShowConnectDialog] = useState(false);
+
+  // MadeLocal connected source
+  const madelocal = useMadeLocalRevenue();
+  const madeLocalTotal = madelocal.status === "connected" ? (madelocal.data?.total ?? 0) : 0;
+
+  useEffect(() => {
+    onMadeLocalTotalChange?.(madeLocalTotal);
+  }, [madeLocalTotal, onMadeLocalTotalChange]);
 
   // form
   const [entrySourceId, setEntrySourceId] = useState<string>("");
@@ -92,10 +123,20 @@ export function RevenueSources({ onTotalChange }: Props) {
     if (!entrySourceId && sources[0]) setEntrySourceId(sources[0].id);
   }, [sources, entrySourceId]);
 
-  const total = useMemo(() => entries.reduce((s, e) => s + e.amount, 0), [entries]);
+  // Split entries: manual (active sources) vs legacy MadeLocal (read-only)
+  const legacyMadeLocalSourceIds = useMemo(() => {
+    // Any entry whose sourceId is "madelocal" is a legacy tag from the prior model.
+    return new Set(entries.filter((e) => e.sourceId === "madelocal").map((e) => e.sourceId));
+  }, [entries]);
+
+  const manualTotal = useMemo(
+    () => entries.filter((e) => e.sourceId !== "madelocal").reduce((s, e) => s + e.amount, 0),
+    [entries],
+  );
+
   useEffect(() => {
-    onTotalChange?.(total);
-  }, [total, onTotalChange]);
+    onTotalChange?.(manualTotal);
+  }, [manualTotal, onTotalChange]);
 
   const availablePresets = PRESETS.filter((p) => !sources.some((s) => s.id === p.id));
 
@@ -147,6 +188,29 @@ export function RevenueSources({ onTotalChange }: Props) {
     return map;
   }, [entries]);
 
+  const connectPill = (() => {
+    switch (madelocal.status) {
+      case "connected":
+        return { label: "Connected", tone: "bg-primary/15 text-primary" };
+      case "connecting":
+        return { label: "Connecting…", tone: "bg-accent/20 text-accent-foreground" };
+      case "error":
+        return { label: "Error", tone: "bg-destructive/15 text-destructive" };
+      default:
+        return { label: "Not connected", tone: "bg-muted text-muted-foreground" };
+    }
+  })();
+
+  const handleConnectClick = () => {
+    if (MADELOCAL_LIVE) {
+      // In live mode this will open the shared-cookie session check or
+      // redirect to the madelocal handoff origin.
+      madelocal.connect();
+    } else {
+      setShowConnectDialog(true);
+    }
+  };
+
   return (
     <section className="neu-card p-5 md:p-7 flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -157,49 +221,109 @@ export function RevenueSources({ onTotalChange }: Props) {
           </p>
         </div>
         <div className="neu-inset px-5 py-3 rounded-2xl text-right">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Total revenue</div>
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Total tracked</div>
           <div className="font-display text-2xl md:text-3xl font-semibold text-primary">
-            ${total.toFixed(2)}
+            ${(manualTotal + madeLocalTotal).toFixed(2)}
           </div>
         </div>
       </div>
 
-      {/* Source chips */}
-      <div className="flex flex-wrap gap-2">
-        {sources.map((s) => {
-          const Icon = iconFor(s.preset);
-          const subtotal = perSource.get(s.id) ?? 0;
-          return (
-            <div
-              key={s.id}
-              className="neu-card-sm px-3 py-2 flex items-center gap-2 text-sm"
-            >
-              <Icon className="h-4 w-4 text-primary" />
-              <span className="font-medium">{s.name}</span>
-              <span className="text-muted-foreground text-xs">
-                ${subtotal.toFixed(2)}
-              </span>
+      {/* Connected source — MadeLocal */}
+      <div className="neu-card-sm p-4 md:p-5 flex flex-col md:flex-row md:items-center gap-4">
+        <div className="h-11 w-11 rounded-xl neu-inset grid place-items-center shrink-0">
+          <Store className="h-5 w-5 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="font-display text-lg font-semibold">MadeLocal</div>
+            <span className={cn("text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full", connectPill.tone)}>
+              {connectPill.label}
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {madelocal.status === "connected" && madelocal.data
+              ? `${madelocal.data.txCount} orders · updated ${formatRelative(madelocal.data.lastUpdated)}`
+              : "Pull your marketplace sales automatically from your MadeLocal seller account."}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {madelocal.status === "connected" ? (
+            <>
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Last 30 days</div>
+                <div className="font-display text-xl font-semibold text-primary">
+                  ${madeLocalTotal.toFixed(2)}
+                </div>
+              </div>
               <button
-                onClick={() => removeSource(s.id)}
-                aria-label={`Remove ${s.name}`}
-                className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
+                onClick={() => {
+                  madelocal.refresh();
+                  toast.success("MadeLocal revenue refreshed");
+                }}
+                className="neu-pressable p-2.5"
+                aria-label="Refresh MadeLocal"
+                title="Refresh"
               >
-                <X className="h-3.5 w-3.5" />
+                <RefreshCw className="h-4 w-4 text-primary" />
               </button>
-            </div>
-          );
-        })}
-        {sources.length === 0 && (
-          <span className="text-sm text-muted-foreground">No sources yet — add one below.</span>
-        )}
+              <button
+                onClick={() => {
+                  madelocal.disconnect();
+                  toast.message("MadeLocal disconnected");
+                }}
+                className="neu-pressable p-2.5"
+                aria-label="Disconnect MadeLocal"
+                title="Disconnect"
+              >
+                <Link2Off className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={handleConnectClick}
+              disabled={madelocal.status === "connecting"}
+              className="neu-pressable px-4 py-2.5 text-sm font-semibold text-primary flex items-center gap-2 disabled:opacity-50"
+            >
+              <Link2 className="h-4 w-4" />
+              {madelocal.status === "connecting" ? "Connecting…" : "Connect MadeLocal"}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Add source */}
+      {/* Manual source chips */}
       <div className="flex flex-col gap-3">
         <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Add a source
+          Manual sources
         </div>
         <div className="flex flex-wrap gap-2">
+          {sources.map((s) => {
+            const Icon = iconFor(s.preset);
+            const subtotal = perSource.get(s.id) ?? 0;
+            return (
+              <div
+                key={s.id}
+                className="neu-card-sm px-3 py-2 flex items-center gap-2 text-sm"
+              >
+                <Icon className="h-4 w-4 text-primary" />
+                <span className="font-medium">{s.name}</span>
+                <span className="text-muted-foreground text-xs">${subtotal.toFixed(2)}</span>
+                <button
+                  onClick={() => removeSource(s.id)}
+                  aria-label={`Remove ${s.name}`}
+                  className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            );
+          })}
+          {sources.length === 0 && (
+            <span className="text-sm text-muted-foreground">No manual sources yet — add one below.</span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-1">
           {availablePresets.map((p) => {
             const Icon = iconFor(p.preset);
             return (
@@ -251,14 +375,19 @@ export function RevenueSources({ onTotalChange }: Props) {
           )}
         </div>
         <p className="text-xs text-muted-foreground">
-          Manual entry today. Direct integrations with Venmo, Zelle, PayPal, Stripe, and MadeLocal coming soon.
+          Direct integrations with Venmo, Zelle, PayPal, and Stripe coming soon.
         </p>
       </div>
 
-      {/* Log revenue */}
+      {/* Log revenue (manual only — MadeLocal excluded) */}
       <div className="neu-inset p-4 md:p-5 rounded-2xl flex flex-col gap-3">
-        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Log revenue
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Log revenue
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            MadeLocal revenue is pulled from your account automatically.
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_120px_140px_140px_auto] gap-2 md:gap-3">
           <select
@@ -326,8 +455,9 @@ export function RevenueSources({ onTotalChange }: Props) {
           </div>
           <ul className="flex flex-col gap-2">
             {entries.slice(0, 8).map((e) => {
+              const isLegacyML = legacyMadeLocalSourceIds.has(e.sourceId);
               const src = sourceById(e.sourceId);
-              const Icon = iconFor(src?.preset);
+              const Icon = iconFor(isLegacyML ? "madelocal" : src?.preset);
               return (
                 <li
                   key={e.id}
@@ -337,8 +467,13 @@ export function RevenueSources({ onTotalChange }: Props) {
                     <Icon className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium truncate">
-                      {src?.name ?? "Removed source"}
+                    <div className="text-sm font-medium truncate flex items-center gap-2">
+                      {isLegacyML ? "MadeLocal" : (src?.name ?? "Removed source")}
+                      {isLegacyML && (
+                        <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          Manual (legacy)
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {fmtDate(e.date)} · per {e.cadence}
@@ -358,6 +493,54 @@ export function RevenueSources({ onTotalChange }: Props) {
               );
             })}
           </ul>
+        </div>
+      )}
+
+      {/* Connect dialog (mock mode) */}
+      {showConnectDialog && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center p-4 bg-background/60 backdrop-blur-sm"
+          onClick={() => setShowConnectDialog(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="neu-card max-w-md w-full p-6 flex flex-col gap-4"
+          >
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl neu-inset grid place-items-center shrink-0">
+                <Store className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-display text-xl font-semibold">Connect MadeLocal</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Coming soon — this will use your MadeLocal seller sign-in to pull marketplace sales into your true profit automatically. No data is copied; it stays in your MadeLocal account.
+                </p>
+              </div>
+            </div>
+            <ul className="text-xs text-muted-foreground flex flex-col gap-1.5 pl-1">
+              <li className="flex gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" /> Shared sign-in with MadeLocal</li>
+              <li className="flex gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" /> Read-only access to your sales</li>
+              <li className="flex gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" /> Disconnect any time</li>
+            </ul>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowConnectDialog(false)}
+                className="neu-pressable px-4 py-2 text-sm font-medium"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowConnectDialog(false);
+                  madelocal.connect();
+                  toast.success("Simulated MadeLocal connection");
+                }}
+                className="neu-pressable px-4 py-2 text-sm font-semibold text-primary flex items-center gap-2"
+              >
+                <Link2 className="h-4 w-4" /> Simulate connection
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>
