@@ -82,16 +82,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Command center for local food producers — analyze social posts, plan markets, and track true profit.",
+          "One place for local food producers to analyze social posts, plan markets, and track true profit.",
       },
       { property: "og:title", content: "MadeLocal — Seller Command Center" },
       {
         property: "og:description",
         content:
-          "Marketing coach, market calendar, and profit tracker built for bakers, farmers, and market vendors.",
+          "One place for local food producers to analyze social posts, plan markets, and track true profit.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "MadeLocal — Seller Command Center" },
+      { name: "twitter:description", content: "One place for local food producers to analyze social posts, plan markets, and track true profit." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/41554ea6-d5b8-438f-9464-08facc9e2e20/id-preview-ac67093c--365c2d99-0407-4b33-b9c3-198bc3e20e81.lovable.app-1784912074974.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/41554ea6-d5b8-438f-9464-08facc9e2e20/id-preview-ac67093c--365c2d99-0407-4b33-b9c3-198bc3e20e81.lovable.app-1784912074974.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

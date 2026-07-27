@@ -14,7 +14,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          "Marketing coach, market calendar, and profit tracker for bakers, farmers, and market vendors.",
+          "One place for local food producers to analyze social posts, plan markets, and track true profit.",
       },
     ],
   }),
