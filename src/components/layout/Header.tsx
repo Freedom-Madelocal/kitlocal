@@ -1,23 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ChevronsUpDown, Plus, Bell, Moon, Sun } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { sellers, type Seller } from "@/lib/mock-data";
+import { Plus, Bell, Moon, Sun } from "lucide-react";
+import { type Seller } from "@/lib/mock-data";
 import { toast } from "sonner";
 
 type Props = {
   seller: Seller;
-  onSellerChange: (s: Seller) => void;
   mobileButton?: ReactNode;
 };
 
-export function Header({ seller, onSellerChange, mobileButton }: Props) {
+export function Header({ seller, mobileButton }: Props) {
   const [isDark, setIsDark] = useState(false);
   useEffect(() => {
     const stored = localStorage.getItem("theme");
