@@ -17,7 +17,7 @@ const tabs = [
 
 export function AppShell() {
   const [tab, setTab] = useState<TabKey>("marketing");
-  const [seller, setSeller] = useState<Seller>(sellers[0]);
+  const seller: Seller = sellers[0];
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
@@ -56,7 +56,7 @@ export function AppShell() {
         <div className="flex-1 flex flex-col min-w-0">
           <Header
             seller={seller}
-            onSellerChange={setSeller}
+
             mobileButton={
               <button
                 className="md:hidden neu-pressable h-10 w-10 grid place-items-center"
