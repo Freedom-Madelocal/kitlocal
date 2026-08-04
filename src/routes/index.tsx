@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, ClientOnly } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/AppShell";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,5 +23,16 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  return <AppShell />;
+  return (
+    <ClientOnly
+      fallback={
+        <div className="min-h-screen w-full bg-background grid place-items-center">
+          <div className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+        </div>
+      }
+    >
+      <AppShell />
+    </ClientOnly>
+  );
 }
+
