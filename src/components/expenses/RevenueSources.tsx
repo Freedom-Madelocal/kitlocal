@@ -301,9 +301,8 @@ export function RevenueSources({ onTotalChange, onMadeLocalTotalChange }: Props)
             </button>
           )}
         </div>
-
-        </div>
       </div>
+
 
       {/* Manual source chips */}
       <div className="flex flex-col gap-3">
