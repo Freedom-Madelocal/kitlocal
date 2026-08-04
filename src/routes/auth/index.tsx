@@ -8,7 +8,7 @@ import {
   displayNameFor,
 } from "@/lib/madelocal-session";
 
-export const Route = createFileRoute("/auth")({
+export const Route = createFileRoute("/auth/")({
   ssr: false,
   head: () => ({
     meta: [

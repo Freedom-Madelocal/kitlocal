@@ -1,7 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Plus, Bell, Moon, Sun } from "lucide-react";
+import { Plus, Bell, Moon, Sun, LogIn, LogOut } from "lucide-react";
 import { type Seller } from "@/lib/mock-data";
 import { toast } from "sonner";
+import { Link } from "@tanstack/react-router";
+import {
+  useMadeLocalSession,
+  signOutMadeLocal,
+  displayNameFor,
+} from "@/lib/madelocal-session";
 
 type Props = {
   seller: Seller;
@@ -9,6 +15,8 @@ type Props = {
 };
 
 export function Header({ seller, mobileButton }: Props) {
+  const session = useMadeLocalSession();
+
   const [isDark, setIsDark] = useState(false);
   useEffect(() => {
     const stored = localStorage.getItem("theme");
