@@ -40,11 +40,16 @@ export function Header({ seller, mobileButton }: Props) {
               {seller.initials}
             </div>
             <div className="min-w-0 text-left">
-              <div className="text-sm font-semibold truncate">{seller.name}</div>
-              <div className="text-[11px] text-muted-foreground truncate">{seller.category}</div>
+              <div className="text-sm font-semibold truncate">
+                {displayNameFor(session.user) ?? seller.name}
+              </div>
+              <div className="text-[11px] text-muted-foreground truncate">
+                {session.user ? "MadeLocal account" : seller.category}
+              </div>
             </div>
           </div>
         </div>
+
 
         <div className="flex items-center gap-2 shrink-0">
           <button
