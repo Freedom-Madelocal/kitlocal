@@ -242,8 +242,14 @@ export function RevenueSources({ onTotalChange, onMadeLocalTotalChange }: Props)
           </div>
           <div className="text-xs text-muted-foreground mt-1">
             {madelocal.status === "connected" && madelocal.data
-              ? `${madelocal.data.txCount} orders · updated ${formatRelative(madelocal.data.lastUpdated)}`
-              : "Pull your marketplace sales automatically from your MadeLocal seller account."}
+              ? `${madelocal.data.txCount} orders · updated ${formatRelative(madelocal.data.lastUpdated)}${
+                  madelocal.accountLabel ? ` · ${madelocal.accountLabel}` : ""
+                }${madelocal.stale ? " · showing last known figure" : ""}`
+              : madelocal.error
+                ? madelocal.error
+                : madelocal.live
+                  ? "Sign in with your MadeLocal account to sync marketplace sales automatically."
+                  : "Pull your marketplace sales automatically from your MadeLocal seller account."}
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -266,17 +272,19 @@ export function RevenueSources({ onTotalChange, onMadeLocalTotalChange }: Props)
               >
                 <RefreshCw className="h-4 w-4 text-primary" />
               </button>
-              <button
-                onClick={() => {
-                  madelocal.disconnect();
-                  toast.message("MadeLocal disconnected");
-                }}
-                className="neu-pressable p-2.5"
-                aria-label="Disconnect MadeLocal"
-                title="Disconnect"
-              >
-                <Link2Off className="h-4 w-4 text-muted-foreground" />
-              </button>
+              {!madelocal.live && (
+                <button
+                  onClick={() => {
+                    madelocal.disconnect();
+                    toast.message("MadeLocal disconnected");
+                  }}
+                  className="neu-pressable p-2.5"
+                  aria-label="Disconnect MadeLocal"
+                  title="Disconnect"
+                >
+                  <Link2Off className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
             </>
           ) : (
             <button
@@ -285,9 +293,15 @@ export function RevenueSources({ onTotalChange, onMadeLocalTotalChange }: Props)
               className="neu-pressable px-4 py-2.5 text-sm font-semibold text-primary flex items-center gap-2 disabled:opacity-50"
             >
               <Link2 className="h-4 w-4" />
-              {madelocal.status === "connecting" ? "Connecting…" : "Connect MadeLocal"}
+              {madelocal.status === "connecting"
+                ? "Connecting…"
+                : madelocal.live
+                  ? "Sign in with MadeLocal"
+                  : "Connect MadeLocal"}
             </button>
           )}
+        </div>
+
         </div>
       </div>
 
