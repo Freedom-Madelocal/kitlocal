@@ -72,7 +72,29 @@ export function Header({ seller, mobileButton }: Props) {
           >
             <Plus className="h-4 w-4" /> New post
           </button>
+          {session.configured &&
+            (session.user ? (
+              <button
+                className="neu-pressable flex items-center gap-2 px-3 h-10 text-sm font-medium"
+                onClick={async () => {
+                  await signOutMadeLocal();
+                  toast.message("Signed out of MadeLocal");
+                }}
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden md:inline">Sign out</span>
+              </button>
+            ) : (
+              <Link
+                to="/auth"
+                className="neu-pressable flex items-center gap-2 px-3 h-10 text-sm font-semibold text-primary"
+              >
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline">Sign in</span>
+              </Link>
+            ))}
         </div>
+
       </div>
     </header>
   );
