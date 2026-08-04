@@ -1,22 +1,19 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { marketRevenueTotal } from "./mock-data";
+import { isMadeLocalConfigured } from "./madelocal-supabase";
+import { useMadeLocalSession } from "./madelocal-session";
+import { fetchMadeLocalRevenue } from "./madelocal-sales";
 
 /**
  * MadeLocal integration adapter.
  *
- * TODO (CTO 8-step sequence, steps 4–8) — do not enable until confirmed:
- *   1. `transactions.status` value for a Stripe-completed order
- *   2. RLS on `transactions` includes `seller_id = auth.uid()`
- *   3. `amount` vs `final_amount` for post-fee revenue
- *   4. `transactions.seller_id` is indexed
- *   5. refund/void columns to exclude
- *
- * When gates clear, swap `useMadeLocalRevenue` internals to call a
- * `createServerFn` (`getMySales`) against the shared Supabase project —
- * same return shape, so callers do not change.
+ * Live mode is driven by whether the shared MadeLocal project credentials are
+ * present (VITE_MADELOCAL_SUPABASE_URL / _ANON_KEY). With them set, connection
+ * status is the real session and revenue comes from `transactions`. Without
+ * them, the mock adapter keeps the demo interactive.
  */
 
-export const MADELOCAL_LIVE = false;
+export const MADELOCAL_LIVE = isMadeLocalConfigured;
 
 export type MadeLocalConnectionStatus =
   | "disconnected"
@@ -62,45 +59,100 @@ export function getMockMadeLocalRevenue(): MadeLocalRevenue {
   };
 }
 
-/**
- * Reads MadeLocal revenue for the signed-in seller.
- * Today: returns mock data when the user has "connected" (simulated).
- * Later: swaps to a `createServerFn` query against `transactions`.
- */
-export function useMadeLocalRevenue(): {
+export type MadeLocalRevenueState = {
   status: MadeLocalConnectionStatus;
   data: MadeLocalRevenue | null;
+  live: boolean;
+  stale: boolean;
+  error: string | null;
+  accountLabel: string | null;
   connect: () => void;
   disconnect: () => void;
   refresh: () => void;
-} {
+};
+
+/**
+ * Reads MadeLocal revenue for the signed-in seller.
+ * Live: session-derived status + real `transactions` sum.
+ * Demo (no credentials): simulated connection with mock numbers.
+ */
+export function useMadeLocalRevenue(): MadeLocalRevenueState {
+  const session = useMadeLocalSession();
+  const live = session.configured;
+
   const [status, setStatus] = useState<MadeLocalConnectionStatus>(() =>
-    getStoredConnectionStatus(),
+    isMadeLocalConfigured ? "connecting" : getStoredConnectionStatus(),
   );
   const [data, setData] = useState<MadeLocalRevenue | null>(() =>
-    getStoredConnectionStatus() === "connected" ? getMockMadeLocalRevenue() : null,
+    isMadeLocalConfigured || getStoredConnectionStatus() !== "connected"
+      ? null
+      : getMockMadeLocalRevenue(),
   );
+  const [stale, setStale] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setStoredConnectionStatus(status);
-    if (status === "connected") {
-      setData(getMockMadeLocalRevenue());
-    } else if (status === "disconnected") {
-      setData(null);
+  const load = useCallback(async () => {
+    const result = await fetchMadeLocalRevenue(30);
+    if (result.ok) {
+      setData(result.data);
+      setStale(false);
+      setError(null);
+      setStatus("connected");
+    } else {
+      setError(result.error);
+      setData(result.data);
+      setStale(Boolean(result.data));
+      setStatus(result.data ? "connected" : "error");
     }
-  }, [status]);
+  }, []);
+
+  // Live path: status follows the session, revenue follows the signed-in user.
+  useEffect(() => {
+    if (!live) return;
+    if (session.loading) {
+      setStatus("connecting");
+      return;
+    }
+    if (!session.user) {
+      setStatus("disconnected");
+      setData(null);
+      setStale(false);
+      setError(null);
+      return;
+    }
+    void load();
+  }, [live, session.loading, session.user?.id, load]);
+
+  // Demo path: simulated connection persisted locally.
+  useEffect(() => {
+    if (live) return;
+    setStoredConnectionStatus(status);
+    if (status === "connected") setData(getMockMadeLocalRevenue());
+    else if (status === "disconnected") setData(null);
+  }, [live, status]);
 
   return {
     status,
     data,
+    live,
+    stale,
+    error,
+    accountLabel: session.user?.email ?? null,
     connect: () => {
+      if (live) {
+        // Live: the session is the connection — send them to sign in.
+        if (typeof window !== "undefined") window.location.assign("/auth");
+        return;
+      }
       setStatus("connecting");
-      // Simulate handshake — in live mode this will kick off the shared-cookie
-      // check or Mechanism 2 code exchange via /auth/handoff.
       setTimeout(() => setStatus("connected"), 700);
     },
     disconnect: () => setStatus("disconnected"),
     refresh: () => {
+      if (live) {
+        if (session.user) void load();
+        return;
+      }
       if (status === "connected") setData(getMockMadeLocalRevenue());
     },
   };
