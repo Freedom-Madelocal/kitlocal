@@ -73,7 +73,9 @@ export function AppShell() {
 
           <main className="flex-1 px-4 md:px-8 py-6 md:py-8 pb-28 md:pb-10 max-w-6xl w-full mx-auto">
             {tab === "marketing" && <MarketingHub seller={seller} />}
+            {tab === "inbox" && <InboxView />}
             {tab === "calendar" && <CalendarView />}
+
             {tab === "expenses" && <ExpensesView />}
           </main>
         </div>
