@@ -6,13 +6,30 @@ import type { MadeLocalRevenue } from "./madelocal-integration";
  * MadeLocal project. RLS scopes rows to the seller, so no service key or
  * server function is involved.
  *
- * These three values are the CTO gates — adjust once confirmed in the
- * MadeLocal Supabase dashboard:
+ * Confirmed: `transactions` has a participants SELECT policy that includes
+ * `auth.uid() = seller_id`, so a signed-in seller reads exactly their own rows
+ * with the publishable key.
+ *
+ * Two details are still unconfirmed, so the read is tolerant of both rather
+ * than guessing: the exact `status` value written for a completed payment, and
+ * whether `final_amount` or `amount` is the post-fee figure. We prefer
+ * `final_amount` when the column exists and is populated, and treat any of the
+ * common completed spellings as revenue.
  */
 export const TX_TABLE = "transactions";
-export const TX_STATUS_COMPLETED = "completed"; // gate 1
-export const TX_AMOUNT_FIELD = "final_amount"; // gate 3 (post platform fee)
-// gate 2: transactions needs a SELECT policy of the shape seller_id = auth.uid()
+
+/** Any of these in `status` counts as money actually collected. */
+export const TX_COMPLETED_STATUSES = [
+  "completed",
+  "complete",
+  "paid",
+  "succeeded",
+  "success",
+];
+
+/** Preferred first; falls back to the next when the column is absent/null. */
+export const TX_AMOUNT_FIELDS = ["final_amount", "amount"] as const;
+
 
 const LAST_GOOD_KEY = "ml.madelocal.lastGoodRevenue.v1";
 
