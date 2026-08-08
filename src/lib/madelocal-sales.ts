@@ -68,22 +68,48 @@ export async function fetchMadeLocalRevenue(days = 30): Promise<SalesResult> {
   const sinceDate = new Date(Date.now() - days * 24 * 3600 * 1000);
   const since = sinceDate.toISOString();
 
-  const { data, error } = await supabase
-    .from(TX_TABLE)
-    .select(`${TX_AMOUNT_FIELD}, created_at`)
-    .eq("seller_id", userId)
-    .eq("status", TX_STATUS_COMPLETED)
-    .gte("created_at", since);
+  // Select both candidate amount columns; retry with `amount` only if
+  // `final_amount` doesn't exist in this schema.
+  let rows: Array<Record<string, unknown>> = [];
+  let lastError: string | null = null;
 
-  if (error) {
-    return { ok: false, error: error.message, data: readLastGood() };
+  for (const columns of ["final_amount, amount, status, created_at", "amount, status, created_at"]) {
+    const { data, error } = await supabase
+      .from(TX_TABLE)
+      .select(columns)
+      .eq("seller_id", userId)
+      .gte("created_at", since);
+
+    if (!error) {
+      rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
+      lastError = null;
+      break;
+    }
+    lastError = error.message;
+    // Only a missing-column error is worth retrying with a narrower select.
+    if (!/column .* does not exist|final_amount/i.test(error.message)) break;
   }
 
-  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  if (lastError) {
+    return { ok: false, error: lastError, data: readLastGood() };
+  }
+
+  const completed = rows.filter((row) => {
+    const status = String(row['status'] ?? "").toLowerCase();
+    return TX_COMPLETED_STATUSES.includes(status);
+  });
+
+  const amountOf = (row: Record<string, unknown>) => {
+    for (const field of TX_AMOUNT_FIELDS) {
+      const value = Number(row[field]);
+      if (Number.isFinite(value) && value !== 0) return value;
+    }
+    return 0;
+  };
+
   const total =
-    Math.round(
-      rows.reduce((sum, row) => sum + (Number(row[TX_AMOUNT_FIELD]) || 0), 0) * 100,
-    ) / 100;
+    Math.round(completed.reduce((sum, row) => sum + amountOf(row), 0) * 100) / 100;
+
 
   const result: MadeLocalRevenue = {
     total,
