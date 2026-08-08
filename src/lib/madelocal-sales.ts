@@ -115,7 +115,7 @@ export async function fetchMadeLocalRevenue(days = 30): Promise<SalesResult> {
     total,
     since: since.slice(0, 10),
     lastUpdated: new Date().toISOString(),
-    txCount: rows.length,
+    txCount: completed.length,
   };
   writeLastGood(result);
   return { ok: true, data: result };
