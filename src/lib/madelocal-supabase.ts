@@ -14,14 +14,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * host-only, so the /auth sign-in form is the entry path there.
  */
 
-const SUPABASE_URL = import.meta.env['VITE_MADELOCAL_SUPABASE_URL'] as string | undefined;
-const SUPABASE_ANON_KEY = import.meta.env['VITE_MADELOCAL_SUPABASE_ANON_KEY'] as
-  | string
-  | undefined;
+const SUPABASE_URL = MADELOCAL_SUPABASE_URL || undefined;
+const SUPABASE_ANON_KEY = MADELOCAL_SUPABASE_ANON_KEY || undefined;
 
 export const SHARED_COOKIE_DOMAIN = ".buymadelocal.com";
 
 export const isMadeLocalConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+
 
 function cookieDomainAttr(): string {
   if (typeof window === "undefined") return "";
