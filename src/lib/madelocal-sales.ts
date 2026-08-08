@@ -6,13 +6,30 @@ import type { MadeLocalRevenue } from "./madelocal-integration";
  * MadeLocal project. RLS scopes rows to the seller, so no service key or
  * server function is involved.
  *
- * These three values are the CTO gates — adjust once confirmed in the
- * MadeLocal Supabase dashboard:
+ * Confirmed: `transactions` has a participants SELECT policy that includes
+ * `auth.uid() = seller_id`, so a signed-in seller reads exactly their own rows
+ * with the publishable key.
+ *
+ * Two details are still unconfirmed, so the read is tolerant of both rather
+ * than guessing: the exact `status` value written for a completed payment, and
+ * whether `final_amount` or `amount` is the post-fee figure. We prefer
+ * `final_amount` when the column exists and is populated, and treat any of the
+ * common completed spellings as revenue.
  */
 export const TX_TABLE = "transactions";
-export const TX_STATUS_COMPLETED = "completed"; // gate 1
-export const TX_AMOUNT_FIELD = "final_amount"; // gate 3 (post platform fee)
-// gate 2: transactions needs a SELECT policy of the shape seller_id = auth.uid()
+
+/** Any of these in `status` counts as money actually collected. */
+export const TX_COMPLETED_STATUSES = [
+  "completed",
+  "complete",
+  "paid",
+  "succeeded",
+  "success",
+];
+
+/** Preferred first; falls back to the next when the column is absent/null. */
+export const TX_AMOUNT_FIELDS = ["final_amount", "amount"] as const;
+
 
 const LAST_GOOD_KEY = "ml.madelocal.lastGoodRevenue.v1";
 
@@ -51,28 +68,54 @@ export async function fetchMadeLocalRevenue(days = 30): Promise<SalesResult> {
   const sinceDate = new Date(Date.now() - days * 24 * 3600 * 1000);
   const since = sinceDate.toISOString();
 
-  const { data, error } = await supabase
-    .from(TX_TABLE)
-    .select(`${TX_AMOUNT_FIELD}, created_at`)
-    .eq("seller_id", userId)
-    .eq("status", TX_STATUS_COMPLETED)
-    .gte("created_at", since);
+  // Select both candidate amount columns; retry with `amount` only if
+  // `final_amount` doesn't exist in this schema.
+  let rows: Array<Record<string, unknown>> = [];
+  let lastError: string | null = null;
 
-  if (error) {
-    return { ok: false, error: error.message, data: readLastGood() };
+  for (const columns of ["final_amount, amount, status, created_at", "amount, status, created_at"]) {
+    const { data, error } = await supabase
+      .from(TX_TABLE)
+      .select(columns)
+      .eq("seller_id", userId)
+      .gte("created_at", since);
+
+    if (!error) {
+      rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
+      lastError = null;
+      break;
+    }
+    lastError = error.message;
+    // Only a missing-column error is worth retrying with a narrower select.
+    if (!/column .* does not exist|final_amount/i.test(error.message)) break;
   }
 
-  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  if (lastError) {
+    return { ok: false, error: lastError, data: readLastGood() };
+  }
+
+  const completed = rows.filter((row) => {
+    const status = String(row['status'] ?? "").toLowerCase();
+    return TX_COMPLETED_STATUSES.includes(status);
+  });
+
+  const amountOf = (row: Record<string, unknown>) => {
+    for (const field of TX_AMOUNT_FIELDS) {
+      const value = Number(row[field]);
+      if (Number.isFinite(value) && value !== 0) return value;
+    }
+    return 0;
+  };
+
   const total =
-    Math.round(
-      rows.reduce((sum, row) => sum + (Number(row[TX_AMOUNT_FIELD]) || 0), 0) * 100,
-    ) / 100;
+    Math.round(completed.reduce((sum, row) => sum + amountOf(row), 0) * 100) / 100;
+
 
   const result: MadeLocalRevenue = {
     total,
     since: since.slice(0, 10),
     lastUpdated: new Date().toISOString(),
-    txCount: rows.length,
+    txCount: completed.length,
   };
   writeLastGood(result);
   return { ok: true, data: result };
