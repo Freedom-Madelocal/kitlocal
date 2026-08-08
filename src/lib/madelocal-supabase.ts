@@ -1,4 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { MADELOCAL_SUPABASE_URL, MADELOCAL_SUPABASE_ANON_KEY } from "./madelocal-config";
+
 
 /**
  * Client for the SHARED MadeLocal Supabase project.
