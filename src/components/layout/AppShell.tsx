@@ -1,19 +1,22 @@
 import { useState } from "react";
-import { Sparkles, CalendarDays, Receipt, Menu, X } from "lucide-react";
+import { Sparkles, CalendarDays, Receipt, MessagesSquare, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Header } from "./Header";
 import { MarketingHub } from "@/components/marketing/MarketingHub";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { ExpensesView } from "@/components/expenses/ExpensesView";
+import { InboxView } from "@/components/inbox/InboxView";
 import { sellers, type Seller } from "@/lib/mock-data";
 
-export type TabKey = "marketing" | "calendar" | "expenses";
+export type TabKey = "marketing" | "inbox" | "calendar" | "expenses";
 
 const tabs = [
   { key: "marketing" as const, label: "Marketing Hub", icon: Sparkles },
+  { key: "inbox" as const, label: "Inbox", icon: MessagesSquare },
   { key: "calendar" as const, label: "Market Calendar", icon: CalendarDays },
   { key: "expenses" as const, label: "Expenses & Profit", icon: Receipt },
 ];
+
 
 export function AppShell() {
   const [tab, setTab] = useState<TabKey>("marketing");
@@ -70,7 +73,9 @@ export function AppShell() {
 
           <main className="flex-1 px-4 md:px-8 py-6 md:py-8 pb-28 md:pb-10 max-w-6xl w-full mx-auto">
             {tab === "marketing" && <MarketingHub seller={seller} />}
+            {tab === "inbox" && <InboxView />}
             {tab === "calendar" && <CalendarView />}
+
             {tab === "expenses" && <ExpensesView />}
           </main>
         </div>
